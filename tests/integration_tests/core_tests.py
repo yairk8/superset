@@ -744,11 +744,20 @@ class TestCore(SupersetTestCase):
         resp = self.get_json_resp("/tabstateview/", data=data)
         tab_state_id = resp["id"]
 
-        # disallowed fields should be rejected with 400
-        for field in ("user_id", "id"):
+        # sensitive model columns and audit fields must be rejected
+        for field in ("user_id", "id", "created_on", "changed_on", "created_by_fk"):
             payload = {field: json.dumps(99)}
             response = self.client.put(f"/tabstateview/{tab_state_id}", data=payload)
-            assert response.status_code == 400
+            assert response.status_code == 400, f"{field} should be rejected"
+            body = json.loads(response.data)
+            assert field in body.get("error", ""), (
+                f"error response should mention the disallowed field '{field}'"
+            )
+
+        # a mix of allowed and disallowed fields must still be rejected
+        payload = {"sql": json.dumps("SELECT 1"), "user_id": json.dumps(99)}
+        response = self.client.put(f"/tabstateview/{tab_state_id}", data=payload)
+        assert response.status_code == 400
 
         # allowed fields should still work
         payload = {"sql": json.dumps("SELECT 1")}
