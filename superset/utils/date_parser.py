@@ -19,6 +19,7 @@ from __future__ import annotations
 import calendar
 import logging
 import re
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import lru_cache
 from time import struct_time
@@ -65,6 +66,8 @@ ORDINAL_MAP: dict[str, int] = {
     "first": 1,
     "1st": 1,
 }
+
+TimeRangeLookupFn = Callable[..., str]
 
 
 def parse_human_datetime(human_readable: str) -> datetime:
@@ -508,7 +511,7 @@ def get_since_until(  # pylint: disable=too-many-arguments,too-many-locals,too-m
             time_range = handle_nth_of(ordinal, subunit, scope, unit, relative_start)
 
     if time_range and separator in time_range:
-        time_range_lookup = [
+        time_range_lookup: list[tuple[str, TimeRangeLookupFn]] = [
             (
                 r"^(start of|beginning of|end of)\s{1,5}"
                 r"(this|last|next|prior)\s{1,5}"
@@ -573,7 +576,9 @@ def get_since_until(  # pylint: disable=too-many-arguments,too-many-locals,too-m
                 if result:
                     matched = True
                     # converted matched time_range to "formal time expressions"
-                    since_and_until.append(fn(*result.groups()))  # type: ignore
+                    since_and_until.append(
+                        _evaluate_time_range_lookup(fn, result.groups())
+                    )
             if not matched:
                 # default matched case
                 since_and_until.append(f"DATETIME('{part}')")
@@ -798,7 +803,7 @@ class EvalHolidayFunc:  # pylint: disable=too-few-public-methods
 
 
 @lru_cache(maxsize=LRU_CACHE_MAX_SIZE)
-def datetime_parser() -> ParseResults:  # pylint: disable=too-many-locals
+def datetime_parser() -> ParserElement:  # pylint: disable=too-many-locals
     (  # pylint: disable=invalid-name
         DATETIME,  # noqa: N806
         DATEADD,  # noqa: N806
@@ -906,6 +911,12 @@ def datetime_eval(datetime_expression: str | None = None) -> datetime | None:
         except ParseException as ex:
             raise ValueError(ex) from ex
     return None
+
+
+def _evaluate_time_range_lookup(
+    fn: TimeRangeLookupFn, groups: tuple[str | None, ...]
+) -> str:
+    return fn(*groups)
 
 
 class DateRangeMigration:  # pylint: disable=too-few-public-methods
