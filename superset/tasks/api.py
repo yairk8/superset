@@ -32,6 +32,7 @@ from superset.commands.tasks.exceptions import (
     TaskPermissionDeniedError,
 )
 from superset.constants import MODEL_API_RW_METHOD_PERMISSION_MAP, RouteMethod
+from superset.daos.base import _escape_like
 from superset.extensions import event_logger
 from superset.models.tasks import Task
 from superset.tasks.filters import TaskFilter
@@ -380,8 +381,9 @@ class TaskRestApi(BaseSupersetModelRestApi):
     @safe
     @statsd_metrics
     @event_logger.log_this_with_context(
-        action=lambda self, *args, **kwargs: f"{self.__class__.__name__}"
-        ".related_subscribers",
+        action=lambda self, *args, **kwargs: (
+            f"{self.__class__.__name__}.related_subscribers"
+        ),
         log_to_statsd=False,
     )
     def related_subscribers(self) -> Response:
@@ -442,10 +444,13 @@ class TaskRestApi(BaseSupersetModelRestApi):
 
         # Apply search filter if provided
         if search_query := request.args.get("q", ""):
-            like_value = f"%{search_query}%"
+            escaped = _escape_like(search_query)
+            like_value = f"%{escaped}%"
             query = query.filter(
-                (user_model.first_name + " " + user_model.last_name).ilike(like_value)
-                | user_model.username.ilike(like_value)
+                (user_model.first_name + " " + user_model.last_name).ilike(
+                    like_value, escape="\\"
+                )
+                | user_model.username.ilike(like_value, escape="\\")
             )
 
         # Order by name

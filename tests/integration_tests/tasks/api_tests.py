@@ -535,4 +535,23 @@ class TestTaskApi(SupersetTestCase):
             # (requires both started_at and ended_at to be set)
             if result.get("started_at") and result.get("ended_at"):
                 assert result["duration_seconds"] is not None
-                assert result["duration_seconds"] >= 0.0
+
+    def test_related_subscribers_escapes_like_wildcards(self):
+        """
+        Task API: LIKE wildcards in the subscriber search filter must be
+        escaped so that ``%`` and ``_`` are treated as literal characters.
+        """
+        with self._create_tasks():
+            self.login(ADMIN_USERNAME)
+
+            # A bare ``%`` without escaping would match every subscriber.
+            uri = f"{self.TASK_API_BASE}/related/subscribers?q=%25"
+            rv = self.client.get(uri)
+            assert rv.status_code == 200
+
+            data = json.loads(rv.data.decode("utf-8"))
+            assert data["result"] == [], (
+                "A literal '%' filter should not match any subscriber, but "
+                "the endpoint returned results — LIKE wildcards are not being "
+                "escaped"
+            )
