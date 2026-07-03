@@ -17,12 +17,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, TYPE_CHECKING
+from importlib import import_module
+from typing import Any, cast, TYPE_CHECKING
 
 from flask import current_app as app
 from sqlalchemy.sql import compiler
 
 from superset.constants import EXAMPLES_DB_UUID
+from superset.extensions import db
 
 if TYPE_CHECKING:
     from superset.connectors.sqla.models import Database
@@ -31,17 +33,15 @@ logging.getLogger("MARKDOWN").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# TODO: duplicate code with DatabaseDao, below function should be moved or use dao
+def _get_database_dao() -> Any:
+    return import_module("superset.daos.database").DatabaseDAO
+
+
 def get_or_create_db(
     database_name: str, sqlalchemy_uri: str, always_create: bool | None = True
 ) -> Database:
-    # pylint: disable=import-outside-toplevel
-    from superset import db
-    from superset.models import core as models
-
-    database = (
-        db.session.query(models.Database).filter_by(database_name=database_name).first()
-    )
+    database_dao = _get_database_dao()
+    database = database_dao.get_database_by_name(database_name)
 
     # databases with a fixed UUID
     uuids = {
@@ -50,10 +50,12 @@ def get_or_create_db(
 
     if not database and always_create:
         logger.info("Creating database reference for %s", database_name)
-        database = models.Database(
-            database_name=database_name, uuid=uuids.get(database_name)
+        database = database_dao.create(
+            attributes={
+                "database_name": database_name,
+                "uuid": uuids.get(database_name),
+            }
         )
-        db.session.add(database)
         database.set_sqlalchemy_uri(sqlalchemy_uri)
 
     # todo: it's a bad idea to do an update in a get/create function
@@ -61,7 +63,7 @@ def get_or_create_db(
         database.set_sqlalchemy_uri(sqlalchemy_uri)
 
     db.session.flush()
-    return database
+    return cast(Database, database)
 
 
 def get_example_database() -> Database:
@@ -80,10 +82,7 @@ def get_main_database() -> Database:
 # TODO - the below method used by tests so should move there but should move together
 # with above function... think of how to refactor it
 def remove_database(database: Database) -> None:
-    # pylint: disable=import-outside-toplevel
-    from superset import db
-
-    db.session.delete(database)
+    _get_database_dao().delete([database])
     db.session.flush()
 
 
