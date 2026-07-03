@@ -22,12 +22,13 @@ from flask_appbuilder import expose
 from flask_appbuilder.security.decorators import has_access, has_access_api
 from flask_babel import gettext as __
 from sqlalchemy import and_
+from sqlalchemy.exc import SQLAlchemyError
 
 from superset import db
 from superset.models.sql_lab import Query, TableSchema, TabState
 from superset.superset_typing import FlaskResponse
 from superset.utils import json
-from superset.utils.core import error_msg_from_exception, get_user_id
+from superset.utils.core import get_user_id
 from superset.views.base import (
     BaseSupersetView,
     json_error_response,
@@ -97,9 +98,20 @@ class TabStateView(BaseSupersetView):
             db.session.add(tab_state)
             db.session.commit()
             return json_success(json.dumps({"id": tab_state.id}))
-        except Exception as ex:  # pylint: disable=broad-except
+        except (
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            AttributeError,
+            ValueError,
+        ) as ex:
+            logger.warning("Invalid request data in TabStateView.post: %s", ex)
             db.session.rollback()
-            return json_error_response(error_msg_from_exception(ex), 400)
+            return json_error_response(__("Invalid request data"), 400)
+        except SQLAlchemyError:
+            logger.exception("Database error in TabStateView.post")
+            db.session.rollback()
+            return json_error_response(__("An unexpected error occurred"), 500)
 
     @has_access_api
     @expose("/<int:tab_state_id>", methods=("DELETE",))
@@ -119,25 +131,30 @@ class TabStateView(BaseSupersetView):
             ).delete(synchronize_session=False)
             db.session.commit()
             return json_success(json.dumps("OK"))
-        except Exception as ex:  # pylint: disable=broad-except
+        except SQLAlchemyError:
+            logger.exception("Database error in TabStateView.delete")
             db.session.rollback()
-            return json_error_response(error_msg_from_exception(ex), 400)
+            return json_error_response(__("An unexpected error occurred"), 500)
 
     @has_access_api
     @expose("/<int:tab_state_id>", methods=("GET",))
     def get(self, tab_state_id: int) -> FlaskResponse:
-        owner_id = _get_owner_id(tab_state_id)
-        if owner_id is None:
-            return Response(status=404)
-        if owner_id != get_user_id():
-            return Response(status=403)
+        try:
+            owner_id = _get_owner_id(tab_state_id)
+            if owner_id is None:
+                return Response(status=404)
+            if owner_id != get_user_id():
+                return Response(status=403)
 
-        tab_state = db.session.query(TabState).filter_by(id=tab_state_id).first()
-        if tab_state is None:
-            return Response(status=404)
-        return json_success(
-            json.dumps(tab_state.to_dict(), default=json.json_iso_dttm_ser)
-        )
+            tab_state = db.session.query(TabState).filter_by(id=tab_state_id).first()
+            if tab_state is None:
+                return Response(status=404)
+            return json_success(
+                json.dumps(tab_state.to_dict(), default=json.json_iso_dttm_ser)
+            )
+        except SQLAlchemyError:
+            logger.exception("Database error in TabStateView.get")
+            return json_error_response(__("An unexpected error occurred"), 500)
 
     @has_access_api
     @expose("<int:tab_state_id>/activate", methods=("POST",))
@@ -156,20 +173,21 @@ class TabStateView(BaseSupersetView):
             )
             db.session.commit()
             return json_success(json.dumps(tab_state_id))
-        except Exception as ex:  # pylint: disable=broad-except
+        except SQLAlchemyError:
+            logger.exception("Database error in TabStateView.activate")
             db.session.rollback()
-            return json_error_response(error_msg_from_exception(ex), 400)
+            return json_error_response(__("An unexpected error occurred"), 500)
 
     @has_access_api
     @expose("<int:tab_state_id>", methods=("PUT",))
     def put(self, tab_state_id: int) -> FlaskResponse:
-        owner_id = _get_owner_id(tab_state_id)
-        if owner_id is None:
-            return Response(status=404)
-        if owner_id != get_user_id():
-            return Response(status=403)
-
         try:
+            owner_id = _get_owner_id(tab_state_id)
+            if owner_id is None:
+                return Response(status=404)
+            if owner_id != get_user_id():
+                return Response(status=403)
+
             form_data = request.form.to_dict()
             disallowed = form_data.keys() - ALLOWED_TAB_STATE_FIELDS
             if disallowed:
@@ -180,9 +198,20 @@ class TabStateView(BaseSupersetView):
             db.session.query(TabState).filter_by(id=tab_state_id).update(fields)
             db.session.commit()
             return json_success(json.dumps(tab_state_id))
-        except Exception as ex:  # pylint: disable=broad-except
+        except (
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            AttributeError,
+            ValueError,
+        ) as ex:
+            logger.warning("Invalid request data in TabStateView.put: %s", ex)
             db.session.rollback()
-            return json_error_response(error_msg_from_exception(ex), 400)
+            return json_error_response(__("Invalid request data"), 400)
+        except SQLAlchemyError:
+            logger.exception("Database error in TabStateView.put")
+            db.session.rollback()
+            return json_error_response(__("An unexpected error occurred"), 500)
 
     @has_access_api
     @expose("<int:tab_state_id>/migrate_query", methods=("POST",))
@@ -200,9 +229,20 @@ class TabStateView(BaseSupersetView):
             )
             db.session.commit()
             return json_success(json.dumps(tab_state_id))
-        except Exception as ex:  # pylint: disable=broad-except
+        except (
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            AttributeError,
+            ValueError,
+        ) as ex:
+            logger.warning("Invalid request data in TabStateView.migrate_query: %s", ex)
             db.session.rollback()
-            return json_error_response(error_msg_from_exception(ex), 400)
+            return json_error_response(__("Invalid request data"), 400)
+        except SQLAlchemyError:
+            logger.exception("Database error in TabStateView.migrate_query")
+            db.session.rollback()
+            return json_error_response(__("An unexpected error occurred"), 500)
 
     @has_access_api
     @expose("<int:tab_state_id>/query/<client_id>", methods=("DELETE",))
@@ -238,9 +278,10 @@ class TabStateView(BaseSupersetView):
             ).delete(synchronize_session=False)
             db.session.commit()
             return json_success(json.dumps("OK"))
-        except Exception as ex:  # pylint: disable=broad-except
+        except SQLAlchemyError:
+            logger.exception("Database error in TabStateView.delete_query")
             db.session.rollback()
-            return json_error_response(error_msg_from_exception(ex), 400)
+            return json_error_response(__("An unexpected error occurred"), 500)
 
 
 class TableSchemaView(BaseSupersetView):
@@ -275,9 +316,20 @@ class TableSchemaView(BaseSupersetView):
             db.session.add(table_schema)
             db.session.commit()
             return json_success(json.dumps({"id": table_schema.id}))
-        except Exception as ex:  # pylint: disable=broad-except
+        except (
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            AttributeError,
+            ValueError,
+        ) as ex:
+            logger.warning("Invalid request data in TableSchemaView.post: %s", ex)
             db.session.rollback()
-            return json_error_response(error_msg_from_exception(ex), 400)
+            return json_error_response(__("Invalid request data"), 400)
+        except SQLAlchemyError:
+            logger.exception("Database error in TableSchemaView.post")
+            db.session.rollback()
+            return json_error_response(__("An unexpected error occurred"), 500)
 
     @has_access_api
     @expose("/<int:table_schema_id>", methods=("DELETE",))
@@ -298,9 +350,10 @@ class TableSchemaView(BaseSupersetView):
             )
             db.session.commit()
             return json_success(json.dumps("OK"))
-        except Exception as ex:  # pylint: disable=broad-except
+        except SQLAlchemyError:
+            logger.exception("Database error in TableSchemaView.delete")
             db.session.rollback()
-            return json_error_response(error_msg_from_exception(ex), 400)
+            return json_error_response(__("An unexpected error occurred"), 500)
 
     @has_access_api
     @expose("/<int:table_schema_id>/expanded", methods=("POST",))
@@ -323,6 +376,17 @@ class TableSchemaView(BaseSupersetView):
             db.session.commit()
             response = json.dumps({"id": table_schema_id, "expanded": payload})
             return json_success(response)
-        except Exception as ex:  # pylint: disable=broad-except
+        except (
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            AttributeError,
+            ValueError,
+        ) as ex:
+            logger.warning("Invalid request data in TableSchemaView.expanded: %s", ex)
             db.session.rollback()
-            return json_error_response(error_msg_from_exception(ex), 400)
+            return json_error_response(__("Invalid request data"), 400)
+        except SQLAlchemyError:
+            logger.exception("Database error in TableSchemaView.expanded")
+            db.session.rollback()
+            return json_error_response(__("An unexpected error occurred"), 500)
