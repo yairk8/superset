@@ -22,13 +22,12 @@ from flask_appbuilder import expose
 from flask_appbuilder.security.decorators import has_access, has_access_api
 from flask_babel import gettext as __
 from sqlalchemy import and_
-from sqlalchemy.exc import SQLAlchemyError
 
 from superset import db
 from superset.models.sql_lab import Query, TableSchema, TabState
 from superset.superset_typing import FlaskResponse
 from superset.utils import json
-from superset.utils.core import get_user_id
+from superset.utils.core import error_msg_from_exception, get_user_id
 from superset.views.base import (
     BaseSupersetView,
     json_error_response,
@@ -98,12 +97,9 @@ class TabStateView(BaseSupersetView):
             db.session.add(tab_state)
             db.session.commit()
             return json_success(json.dumps({"id": tab_state.id}))
-        except (SQLAlchemyError, ValueError, KeyError):
-            logger.exception("Failed to create tab state")
+        except Exception as ex:  # pylint: disable=broad-except
             db.session.rollback()
-            return json_error_response(
-                __("An error occurred while processing your request"), 400
-            )
+            return json_error_response(error_msg_from_exception(ex), 400)
 
     @has_access_api
     @expose("/<int:tab_state_id>", methods=("DELETE",))
@@ -123,12 +119,9 @@ class TabStateView(BaseSupersetView):
             ).delete(synchronize_session=False)
             db.session.commit()
             return json_success(json.dumps("OK"))
-        except (SQLAlchemyError, ValueError):
-            logger.exception("Failed to delete tab state")
+        except Exception as ex:  # pylint: disable=broad-except
             db.session.rollback()
-            return json_error_response(
-                __("An error occurred while processing your request"), 400
-            )
+            return json_error_response(error_msg_from_exception(ex), 400)
 
     @has_access_api
     @expose("/<int:tab_state_id>", methods=("GET",))
@@ -163,12 +156,9 @@ class TabStateView(BaseSupersetView):
             )
             db.session.commit()
             return json_success(json.dumps(tab_state_id))
-        except (SQLAlchemyError, ValueError):
-            logger.exception("Failed to activate tab state")
+        except Exception as ex:  # pylint: disable=broad-except
             db.session.rollback()
-            return json_error_response(
-                __("An error occurred while processing your request"), 400
-            )
+            return json_error_response(error_msg_from_exception(ex), 400)
 
     @has_access_api
     @expose("<int:tab_state_id>", methods=("PUT",))
@@ -190,12 +180,9 @@ class TabStateView(BaseSupersetView):
             db.session.query(TabState).filter_by(id=tab_state_id).update(fields)
             db.session.commit()
             return json_success(json.dumps(tab_state_id))
-        except (SQLAlchemyError, ValueError):
-            logger.exception("Failed to update tab state")
+        except Exception as ex:  # pylint: disable=broad-except
             db.session.rollback()
-            return json_error_response(
-                __("An error occurred while processing your request"), 400
-            )
+            return json_error_response(error_msg_from_exception(ex), 400)
 
     @has_access_api
     @expose("<int:tab_state_id>/migrate_query", methods=("POST",))
@@ -213,12 +200,9 @@ class TabStateView(BaseSupersetView):
             )
             db.session.commit()
             return json_success(json.dumps(tab_state_id))
-        except (SQLAlchemyError, ValueError, KeyError):
-            logger.exception("Failed to migrate query")
+        except Exception as ex:  # pylint: disable=broad-except
             db.session.rollback()
-            return json_error_response(
-                __("An error occurred while processing your request"), 400
-            )
+            return json_error_response(error_msg_from_exception(ex), 400)
 
     @has_access_api
     @expose("<int:tab_state_id>/query/<client_id>", methods=("DELETE",))
@@ -254,12 +238,9 @@ class TabStateView(BaseSupersetView):
             ).delete(synchronize_session=False)
             db.session.commit()
             return json_success(json.dumps("OK"))
-        except (SQLAlchemyError, ValueError):
-            logger.exception("Failed to delete query")
+        except Exception as ex:  # pylint: disable=broad-except
             db.session.rollback()
-            return json_error_response(
-                __("An error occurred while processing your request"), 400
-            )
+            return json_error_response(error_msg_from_exception(ex), 400)
 
 
 class TableSchemaView(BaseSupersetView):
@@ -294,12 +275,9 @@ class TableSchemaView(BaseSupersetView):
             db.session.add(table_schema)
             db.session.commit()
             return json_success(json.dumps({"id": table_schema.id}))
-        except (SQLAlchemyError, ValueError, KeyError):
-            logger.exception("Failed to create table schema")
+        except Exception as ex:  # pylint: disable=broad-except
             db.session.rollback()
-            return json_error_response(
-                __("An error occurred while processing your request"), 400
-            )
+            return json_error_response(error_msg_from_exception(ex), 400)
 
     @has_access_api
     @expose("/<int:table_schema_id>", methods=("DELETE",))
@@ -320,12 +298,9 @@ class TableSchemaView(BaseSupersetView):
             )
             db.session.commit()
             return json_success(json.dumps("OK"))
-        except (SQLAlchemyError, ValueError):
-            logger.exception("Failed to delete table schema")
+        except Exception as ex:  # pylint: disable=broad-except
             db.session.rollback()
-            return json_error_response(
-                __("An error occurred while processing your request"), 400
-            )
+            return json_error_response(error_msg_from_exception(ex), 400)
 
     @has_access_api
     @expose("/<int:table_schema_id>/expanded", methods=("POST",))
@@ -348,9 +323,6 @@ class TableSchemaView(BaseSupersetView):
             db.session.commit()
             response = json.dumps({"id": table_schema_id, "expanded": payload})
             return json_success(response)
-        except (SQLAlchemyError, ValueError):
-            logger.exception("Failed to update table schema expansion")
+        except Exception as ex:  # pylint: disable=broad-except
             db.session.rollback()
-            return json_error_response(
-                __("An error occurred while processing your request"), 400
-            )
+            return json_error_response(error_msg_from_exception(ex), 400)
