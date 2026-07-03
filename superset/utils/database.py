@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_database_dao() -> Any:
+    """Lazily import and return ``DatabaseDAO`` to avoid circular imports."""
     return import_module("superset.daos.database").DatabaseDAO
 
 
