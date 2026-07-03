@@ -40,6 +40,7 @@ from superset.commands.dashboard.embedded.exceptions import (
     EmbeddedDashboardNotFoundError,
 )
 from superset.commands.exceptions import ForbiddenError
+from superset.daos.base import _escape_like
 from superset.exceptions import SupersetGenericErrorException
 from superset.extensions import db, event_logger
 from superset.security.guest_token import (
@@ -379,7 +380,8 @@ class RoleRestAPI(BaseSupersetApi):
                 query = query.filter(Role.groups.any(id=filter_dict["group_ids"]))
 
             if "name" in filter_dict:
-                query = query.filter(Role.name.ilike(f"%{filter_dict['name']}%"))
+                escaped = _escape_like(filter_dict["name"])
+                query = query.filter(Role.name.ilike(f"%{escaped}%", escape="\\"))
 
             total_count = query.count()
 

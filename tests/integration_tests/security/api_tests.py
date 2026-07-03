@@ -260,8 +260,9 @@ class TestSecurityGuestTokenApiTokenValidator(SupersetTestCase):
 
     @with_config(
         {
-            "GUEST_TOKEN_VALIDATOR_HOOK": lambda x: len(x["rls"]) == 1
-            and "tenant_id=" in x["rls"][0]["clause"]
+            "GUEST_TOKEN_VALIDATOR_HOOK": lambda x: (
+                len(x["rls"]) == 1 and "tenant_id=" in x["rls"][0]["clause"]
+            )
         }
     )
     def test_guest_validator_hook_real_world_example_positive(self):
@@ -276,8 +277,9 @@ class TestSecurityGuestTokenApiTokenValidator(SupersetTestCase):
 
     @with_config(
         {
-            "GUEST_TOKEN_VALIDATOR_HOOK": lambda x: len(x["rls"]) == 1
-            and "tenant_id=" in x["rls"][0]["clause"]
+            "GUEST_TOKEN_VALIDATOR_HOOK": lambda x: (
+                len(x["rls"]) == 1 and "tenant_id=" in x["rls"][0]["clause"]
+            )
         }
     )
     def test_guest_validator_hook_real_world_example_negative(self):
@@ -430,6 +432,26 @@ class TestSecurityRolesApi(SupersetTestCase):
         assert sorted(role2_api["user_ids"]) == role2_expected["user_ids"]
         assert sorted(role2_api["permission_ids"]) == role2_expected["permission_ids"]
         assert role2_api["group_ids"] == role2_expected["group_ids"]
+
+    @pytest.mark.usefixtures("inject_test_roles_data")
+    def test_name_filter_escapes_like_wildcards(self):
+        """
+        Security API: LIKE wildcards in the name filter must be escaped so that
+        ``%`` and ``_`` are treated as literal characters, not pattern
+        metacharacters.
+        """
+        self.login(ADMIN_USERNAME)
+
+        # A bare ``%`` without escaping would match every role.
+        rison_q = "(filters:!((col:name,value:'%25')),page_size:100)"
+        response = self.client.get(f"{self.show_uri}?q={rison_q}")
+        self.assert200(response)
+
+        data = json.loads(response.data.decode("utf-8"))
+        assert data["result"] == [], (
+            "A literal '%' filter should not match any role, but the endpoint "
+            "returned results — LIKE wildcards are not being escaped"
+        )
 
 
 class TestLogoutSessionInvalidation(SupersetTestCase):
