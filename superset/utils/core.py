@@ -553,7 +553,7 @@ def markdown(raw: str, markup_wrap: bool | None = False) -> str:
     # nh3 preserves supported link attributes and enforces a safe rel value.
     safe = nh3.clean(safe, tags=safe_markdown_tags, attributes=safe_markdown_attrs)
     if markup_wrap:
-        safe = Markup(safe)  # noqa: S704
+        safe = Markup(safe)
     return safe
 
 
@@ -632,14 +632,6 @@ def sanitize_url(url: str) -> str:
 
 
 def readfile(file_path: str) -> str | None:
-    """Read a file from disk and return its contents.
-
-    Args:
-        file_path: Path to the file to read.
-
-    Returns:
-        The file contents as a string.
-    """
     with open(file_path) as f:
         content = f.read()
     return content
@@ -708,17 +700,6 @@ def get_datasource_full_name(
     catalog: str | None = None,
     schema: str | None = None,
 ) -> str:
-    """Build a fully qualified datasource name.
-
-    Args:
-        database_name: Name of the database.
-        datasource_name: Name of the datasource.
-        catalog: Optional catalog name.
-        schema: Optional schema name.
-
-    Returns:
-        The dotted datasource path with each part wrapped in brackets.
-    """
     parts = [database_name, catalog, schema, datasource_name]
     return ".".join([f"[{part}]" for part in parts if part])
 
@@ -791,12 +772,6 @@ timeout: type[TimerTimeout] | type[SigalrmTimeout] = (
 
 
 def pessimistic_connection_handling(some_engine: Engine) -> None:
-    """Register SQLAlchemy listeners that validate pooled connections.
-
-    Args:
-        some_engine: Engine to attach the connection checks to.
-    """
-
     @event.listens_for(some_engine, "engine_connect")
     def ping_connection(connection: Connection, branch: bool) -> None:
         if branch:
@@ -956,15 +931,6 @@ def send_mime_email(
     config: dict[str, Any],
     dryrun: bool = False,
 ) -> None:
-    """Send a MIME message through the configured SMTP server.
-
-    Args:
-        e_from: Envelope sender address.
-        e_to: Envelope recipient addresses.
-        mime_msg: MIME message to send.
-        config: SMTP configuration values.
-        dryrun: If true, skip sending the message.
-    """
     smtp_host = config["SMTP_HOST"]
     smtp_port = config["SMTP_PORT"]
     smtp_user = config["SMTP_USER"]
