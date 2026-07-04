@@ -51,6 +51,23 @@ def _get_owner_id(tab_state_id: int) -> int:
     return db.session.query(TabState.user_id).filter_by(id=tab_state_id).scalar()
 
 
+ALLOWED_TAB_STATE_FIELDS = {
+    "active",
+    "autorun",
+    "catalog",
+    "database_id",
+    "extra_json",
+    "hide_left_bar",
+    "label",
+    "latest_query_id",
+    "query_limit",
+    "saved_query_id",
+    "schema",
+    "sql",
+    "template_params",
+}
+
+
 class TabStateView(BaseSupersetView):
     @has_access_api
     @expose("/", methods=("POST",))
@@ -153,7 +170,13 @@ class TabStateView(BaseSupersetView):
             return Response(status=403)
 
         try:
-            fields = {k: json.loads(v) for k, v in request.form.to_dict().items()}
+            form_data = request.form.to_dict()
+            disallowed = form_data.keys() - ALLOWED_TAB_STATE_FIELDS
+            if disallowed:
+                return json_error_response(
+                    f"Unsupported fields: {', '.join(sorted(disallowed))}", 400
+                )
+            fields = {k: json.loads(v) for k, v in form_data.items()}
             db.session.query(TabState).filter_by(id=tab_state_id).update(fields)
             db.session.commit()
             return json_success(json.dumps(tab_state_id))
