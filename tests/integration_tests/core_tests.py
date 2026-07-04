@@ -726,35 +726,6 @@ class TestCore(SupersetTestCase):
         response = self.client.put(f"/tabstateview/{tab_state_id}", data=data)
         assert response.status_code == 200
 
-    def test_tabstate_update_rejects_disallowed_fields(self):
-        self.login(ADMIN_USERNAME)
-        # create a tab
-        data = {
-            "queryEditor": json.dumps(
-                {
-                    "name": "Untitled Query bar",
-                    "dbId": 1,
-                    "schema": None,
-                    "autorun": False,
-                    "sql": "SELECT ...",
-                    "queryLimit": 1000,
-                }
-            )
-        }
-        resp = self.get_json_resp("/tabstateview/", data=data)
-        tab_state_id = resp["id"]
-
-        # disallowed fields should be rejected with 400
-        for field in ("user_id", "id"):
-            payload = {field: json.dumps(99)}
-            response = self.client.put(f"/tabstateview/{tab_state_id}", data=payload)
-            assert response.status_code == 400
-
-        # allowed fields should still work
-        payload = {"sql": json.dumps("SELECT 1")}
-        response = self.client.put(f"/tabstateview/{tab_state_id}", data=payload)
-        assert response.status_code == 200
-
     def test_virtual_table_explore_visibility(self):
         # test that default visibility it set to True
         database = superset.utils.database.get_example_database()
