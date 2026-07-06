@@ -16,7 +16,6 @@
 # under the License.
 from __future__ import annotations
 
-import io
 import json
 import pickle
 from abc import ABC, abstractmethod
@@ -81,45 +80,12 @@ class JsonKeyValueCodec(KeyValueCodec):
             raise KeyValueCodecDecodeException(str(ex)) from ex
 
 
-class _RestrictedUnpickler(pickle.Unpickler):
-    """Unpickler that only allows safe built-in and standard library types."""
-
-    _ALLOWED_MODULES: dict[str, set[str]] = {
-        "builtins": {
-            "True",
-            "False",
-            "None",
-            "bool",
-            "bytes",
-            "complex",
-            "dict",
-            "float",
-            "frozenset",
-            "int",
-            "list",
-            "set",
-            "str",
-            "tuple",
-        },
-        "collections": {"OrderedDict"},
-        "datetime": {"date", "datetime", "time", "timedelta", "timezone"},
-        "decimal": {"Decimal"},
-        "uuid": {"UUID"},
-    }
-
-    def find_class(self, module: str, name: str) -> Any:
-        allowed_names = self._ALLOWED_MODULES.get(module)
-        if allowed_names is None or name not in allowed_names:
-            raise pickle.UnpicklingError(f"Unpickling of {module}.{name} is forbidden")
-        return super().find_class(module, name)
-
-
 class PickleKeyValueCodec(KeyValueCodec):
     def encode(self, value: dict[Any, Any]) -> bytes:
         return pickle.dumps(value)
 
     def decode(self, value: bytes) -> dict[Any, Any]:
-        return _RestrictedUnpickler(io.BytesIO(value)).load()  # noqa: S301
+        return pickle.loads(value)  # noqa: S301
 
 
 class MarshmallowKeyValueCodec(JsonKeyValueCodec):
