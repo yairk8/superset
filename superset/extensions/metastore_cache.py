@@ -26,7 +26,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from superset import db
 from superset.key_value.exceptions import KeyValueCreateFailedError
 from superset.key_value.types import (
-    JsonKeyValueCodec,
     KeyValueCodec,
     KeyValueResource,
     PickleKeyValueCodec,
@@ -56,7 +55,7 @@ class SupersetMetastoreCache(BaseCache):
     ) -> BaseCache:
         seed = config.get("CACHE_KEY_PREFIX", "")
         kwargs["namespace"] = get_uuid_namespace(seed, app)
-        codec = config.get("CODEC") or JsonKeyValueCodec()
+        codec = config.get("CODEC") or PickleKeyValueCodec()
         if (
             has_app_context()
             and not current_app.debug
