@@ -593,7 +593,7 @@ const config = {
       {
         test: /\.ya?ml$/,
         include: ROOT_DIR,
-        loader: 'js-yaml-loader',
+        loader: 'yaml-loader',
       },
       {
         test: /\.geojson$/,

@@ -16,7 +16,9 @@
 # under the License.
 from __future__ import annotations
 
+import io
 import json
+import logging
 import pickle
 from abc import ABC, abstractmethod
 from typing import Any, TypedDict, Union
@@ -29,6 +31,8 @@ from superset.key_value.exceptions import (
     KeyValueCodecEncodeException,
 )
 from superset.utils.backports import StrEnum
+
+logger = logging.getLogger(__name__)
 
 Key = Union[int, UUID]
 
@@ -80,12 +84,35 @@ class JsonKeyValueCodec(KeyValueCodec):
             raise KeyValueCodecDecodeException(str(ex)) from ex
 
 
+# Modules and qualified names considered safe for deserialization.
+_PICKLE_SAFE_MODULES: frozenset[str] = frozenset(
+    {
+        "builtins",
+        "collections",
+        "datetime",
+        "decimal",
+        "fractions",
+        "uuid",
+        "superset.utils.core",
+    }
+)
+
+
+class _RestrictedUnpickler(pickle.Unpickler):
+    """Unpickler that only allows a whitelist of safe types."""
+
+    def find_class(self, module: str, name: str) -> Any:
+        if module not in _PICKLE_SAFE_MODULES:
+            raise pickle.UnpicklingError(f"Unpickling of {module}.{name} is forbidden")
+        return super().find_class(module, name)
+
+
 class PickleKeyValueCodec(KeyValueCodec):
     def encode(self, value: dict[Any, Any]) -> bytes:
         return pickle.dumps(value)
 
     def decode(self, value: bytes) -> dict[Any, Any]:
-        return pickle.loads(value)  # noqa: S301
+        return _RestrictedUnpickler(io.BytesIO(value)).load()  # noqa: S301
 
 
 class MarshmallowKeyValueCodec(JsonKeyValueCodec):
