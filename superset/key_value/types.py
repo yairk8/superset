@@ -16,6 +16,7 @@
 # under the License.
 from __future__ import annotations
 
+import io
 import json
 import pickle
 from abc import ABC, abstractmethod
@@ -80,12 +81,37 @@ class JsonKeyValueCodec(KeyValueCodec):
             raise KeyValueCodecDecodeException(str(ex)) from ex
 
 
+# Modules whose classes are considered safe to reconstruct during unpickling.
+# Anything outside this whitelist is rejected to prevent arbitrary code
+# execution via crafted pickle payloads (CWE-502).
+_PICKLE_SAFE_MODULES: frozenset[str] = frozenset(
+    {
+        "builtins",
+        "collections",
+        "datetime",
+        "decimal",
+        "fractions",
+        "uuid",
+        "superset.utils.core",
+    }
+)
+
+
+class RestrictedUnpickler(pickle.Unpickler):
+    """Unpickler that only allows a whitelist of safe modules to be loaded."""
+
+    def find_class(self, module: str, name: str) -> Any:
+        if module not in _PICKLE_SAFE_MODULES:
+            raise pickle.UnpicklingError(f"Unpickling of {module}.{name} is forbidden")
+        return super().find_class(module, name)
+
+
 class PickleKeyValueCodec(KeyValueCodec):
     def encode(self, value: dict[Any, Any]) -> bytes:
         return pickle.dumps(value)
 
     def decode(self, value: bytes) -> dict[Any, Any]:
-        return pickle.loads(value)  # noqa: S301
+        return RestrictedUnpickler(io.BytesIO(value)).load()  # noqa: S301
 
 
 class MarshmallowKeyValueCodec(JsonKeyValueCodec):
